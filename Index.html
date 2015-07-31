@@ -1,0 +1,309 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+</head>
+<body>
+    <canvas id="canvas" width="450" height="450"></canvas>
+    <div>Black Score: <span id="blackScore">2</span></div>
+    <div>White Score: <span id="whiteScore">2</span></div>
+    <div>Current Turn: <span id="turn">Black</span></div>
+    <div>Computer: <input type="checkbox" id="ai" name="Computer" value="Computer" checked /></div>
+    <div><input type="button" value="New Game" onclick="init();" /></div>
+</body>
+</html>
+
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+<script type="text/javascript">
+    var xCount = 8;
+    var yCount = 8;
+    var canvas = $("#canvas");
+    var context = canvas[0].getContext("2d");
+    var canvasWidth = canvas.width();
+    var canvasHeight = canvas.height();
+    var squareWidth = canvasWidth / xCount;
+    var squareHeight = canvasHeight / yCount;
+    var gridArray;
+    var player = 1;
+
+    function init() {
+        // initialize the gridArray
+        gridArray = [];
+        for (var x = 0; x < xCount; x++) {
+            gridArray[x] = [];
+            for (var y = 0; y < yCount; y++) {
+                gridArray[x][y] = 0;
+            }
+        }
+
+        player = 1;
+
+        var middleX = Math.floor(xCount / 2);
+        var middleY = Math.floor(yCount / 2);
+
+        gridArray[middleX - 1][middleY - 1] = 1;
+        gridArray[middleX - 1][middleY] = 2;
+        gridArray[middleX][middleY - 1] = 2;
+        gridArray[middleX][middleY] = 1;
+
+        paintBoard();
+        calculateScore();
+        updateTurn();
+    }
+
+    function paintBoard() {
+        context.strokeStyle = "blue";
+        context.strokeRect(0, 0, canvasWidth, canvasHeight);
+
+        for (var x = 0; x < xCount; x++) {
+            for (var y = 0; y < yCount; y++) {
+                if (gridArray[x][y] == 1) {
+                    context.fillStyle = "black";
+                } else if (gridArray[x][y] == 2) {
+                    context.fillStyle = "white";
+                } else {
+                    context.fillStyle = "gray";
+                }
+
+                context.fillRect(x * squareWidth, y * squareHeight, squareWidth, squareHeight);
+                context.strokeRect(x * squareWidth, y * squareHeight, squareWidth, squareHeight);
+            }
+        }
+    }
+
+    function getPosition(event) {
+        var x = new Number();
+        var y = new Number();
+        var canvas = document.getElementById("canvas");
+
+        if (event.x != undefined && event.y != undefined) {
+            x = event.x;
+            y = event.y;
+        }
+        else // Firefox method to get the position
+        {
+            x = event.clientX + document.body.scrollLeft +
+                document.documentElement.scrollLeft;
+            y = event.clientY + document.body.scrollTop +
+                document.documentElement.scrollTop;
+        }
+
+        x -= canvas.offsetLeft;
+        y -= canvas.offsetTop;
+
+        x = Math.floor(x / squareWidth);
+        y = Math.floor(y / squareHeight);
+
+        performTurn(x, y);
+
+        if ($("#ai").prop("checked")) {
+            performAiTurn();
+        }
+    }
+
+    function performAiTurn() {
+        var weight = 0;
+        var bestX = -1;
+        var bestY = -1;
+
+        for (var x = 0; x < xCount; x++) {
+            for (var y = 0; y < yCount; y++) {
+                if (gridArray[x][y] == 0) {
+                    var testWeight = countFlips(x, y);
+
+                    if (testWeight > 0 && ((x == 0 && y == 0) || (x == xCount - 1 && y == 0) || (x == 0 && y == yCount - 1) || (x == xCount - 1 && y == yCount - 1))) {
+                        testWeight += Math.max(xCount, yCount);
+                    }
+
+                    if (testWeight > weight) {
+                        weight = testWeight;
+                        bestX = x;
+                        bestY = y;
+                    }
+                }
+            }
+        }
+
+        if (bestX > -1 && bestY > -1) {
+            performTurn(bestX, bestY);
+        }
+    }
+
+    function countFlips(x, y) {
+        var flips = 0;
+
+        var tempGrid = calculateMove(x, y, 0, -1, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+        tempGrid = calculateMove(x, y, 0, 1, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+        tempGrid = calculateMove(x, y, 1, 0, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+        tempGrid = calculateMove(x, y, -1, 0, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+        tempGrid = calculateMove(x, y, 1, 1, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+        tempGrid = calculateMove(x, y, 1, -1, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+        tempGrid = calculateMove(x, y, -1, 1, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+        tempGrid = calculateMove(x, y, -1, -1, 1);
+        if (!tempGrid.equals(gridArray)) {
+            flips = Math.max(flips, countSquares(2, tempGrid));
+        }
+
+        return flips;
+    }
+
+    function countSquares(i, grid) {
+        var count = 0;
+
+        for (var x = 0; x < xCount; x++) {
+            for (var y = 0; y < yCount; y++) {
+                if (grid[x][y] == i) {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    function performTurn(x, y) {
+        if (gridArray[x][y] == 0) {
+            var oppositePlayer = 2;
+
+            if (player == 2) {
+                oppositePlayer = 1;
+            }
+
+            flipDisks(x, y, 0, -1, oppositePlayer);
+            flipDisks(x, y, 0, 1, oppositePlayer);
+            flipDisks(x, y, 1, 0, oppositePlayer);
+            flipDisks(x, y, -1, 0, oppositePlayer);
+            flipDisks(x, y, 1, 1, oppositePlayer);
+            flipDisks(x, y, 1, -1, oppositePlayer);
+            flipDisks(x, y, -1, 1, oppositePlayer);
+            flipDisks(x, y, -1, -1, oppositePlayer);
+
+            if (gridArray[x][y] == player) {
+                player = oppositePlayer;
+                calculateScore();
+                updateTurn();
+            }
+
+            paintBoard();
+        }
+    }
+
+    function calculateScore() {
+        var white = 0;
+        var black = 0;
+
+        for (var x = 0; x < xCount; x++) {
+            for (var y = 0; y < yCount; y++) {
+                if (gridArray[x][y] == 1) {
+                    black++;
+                } else if (gridArray[x][y] == 2) {
+                    white++;
+                }
+            }
+        }
+
+        $("#blackScore").text(black);
+        $("#whiteScore").text(white);
+    }
+
+    function updateTurn() {
+        var turn = $("#turn");
+
+        if (player == 1) {
+            turn.text("Black");
+        } else {
+            turn.text("White");
+        }
+    }
+
+    function flipDisks(x, y, v, h, i) {
+        var tempGrid = calculateMove(x, y, v, h, i);
+
+        if (!gridArray.equals(tempGrid)) {
+            gridArray = $.extend(true, [], tempGrid);
+        }
+    }
+
+    function calculateMove(x, y, v, h, i) {
+        var tempGrid = $.extend(true, [], gridArray);
+        var xx = x;
+        var yy = y;
+        var valid = false;
+
+        while (xx + h >= 0 && yy + v >= 0 && xx + h < xCount && yy + v < yCount) {
+            xx += h;
+            yy += v;
+
+            if (tempGrid[xx][yy] == i) {
+                tempGrid[xx][yy] = player;
+                continue;
+            }
+            if (tempGrid[xx][yy] == player) {
+                if (!gridArray.equals(tempGrid)) {
+                    tempGrid[x][y] = player;
+                    valid = true;
+                }
+                break;
+            }
+            if (tempGrid[xx][yy] == 0) {
+                break;
+            }
+        }
+
+        if (!tempGrid.equals(gridArray) && !valid) {
+            tempGrid = $.extend(true, [], gridArray);
+        }
+
+        return tempGrid;
+    }
+
+    $(document).ready(function () {
+        document.getElementById("canvas").addEventListener("click", getPosition, false);
+        init();
+    })
+
+    Array.prototype.equals = function (array) {
+        // if the other array is a falsy value, return
+        if (!array)
+            return false;
+
+        // compare lengths - can save a lot of time
+        if (this.length != array.length)
+            return false;
+
+        for (var i = 0, l = this.length; i < l; i++) {
+            // Check if we have nested arrays
+            if (this[i] instanceof Array && array[i] instanceof Array) {
+                // recurse into the nested arrays
+                if (!this[i].equals(array[i]))
+                    return false;
+            }
+            else if (this[i] != array[i]) {
+                // Warning - two different object instances will never be equal: {x:20} != {x:20}
+                return false;
+            }
+        }
+        return true;
+    }
+</script>
